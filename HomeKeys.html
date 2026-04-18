@@ -1,0 +1,382 @@
+<html>
+<head>
+	<title>Home Keys</title>
+	<style>
+		body{
+		font: 32px Arial, sans-serif;
+		}
+		.typeText{
+		font: 48px Monaco, monospace; height: 80;
+		}
+		.levelTitle{
+		font: 24px Monaco, monospace; vertical-align: middle; display: table-cell;
+		}
+		.levelInfo{
+		font: 24px Monaco, monospace; vertical-align: middle; display: table-cell;
+		}
+		.selectStyle{
+		font: 24px Monaco, monospace; -webkit-appearance: none;
+		}
+		.centerDiv{
+		width: 750; margin: 0 auto;
+		}
+		.borderDiv{
+		border-style: solid; border-color: black; border-width: 1px; width: 750; height: 10; margin: 0 auto;
+		}
+	</style>
+</head>
+
+<body>
+<div style="width:100%">
+	<div class="centerDiv">
+		<div style="width: 750; height: 50; display: table">
+			<div class="levelInfo"> Level:&nbsp;<select id="selectLevel" class="selectStyle" onchange="changeLevel();"></select></div>
+			<div id="divScore" class="levelInfo" style="width: 30px"></div>
+		</div>
+		<div id="divPrompt" class="typeText"></div>
+		<div id="divTyping" class="typeText"></div>
+		<div class="borderDiv">
+			<div id="divProgress" style="background-color: green; width: 0%; height: 100%"></div>
+		</div>
+		<div class="borderDiv">
+			<div id="divMistakes" style="background-color: red; width: 0%; height: 100%"></div>
+		</div>
+		<div class="borderDiv">
+			<div id="divAttempts" style="background-color: orange; width: 0%; height: 100%"></div>
+		</div>
+		<div id="divKeyboard" class="typeText" style="height:100">
+			<canvas id="keyHighlight" style="background-image:url('keyboard.jpg');" width="750" height="335"/>
+		</div>
+	</div>
+</div>
+</body>
+
+<script type="text/javascript">
+
+function keyMap(key, x, y)
+{
+	this.key = key;
+	this.x = x;
+	this.y = y;
+}
+
+var keyMaps = Object();
+
+function addKeyMap(key, x, y)
+{
+	keyMaps[key] = new keyMap(key, x, y);
+}
+
+addKeyMap("q", 1.5, 1.0);
+addKeyMap("w", 2.5, 1.0);
+addKeyMap("e", 3.5, 1.0);
+addKeyMap("r", 4.5, 1.0);
+addKeyMap("t", 5.5, 1.0);
+addKeyMap("y", 6.5, 1.0);
+addKeyMap("u", 7.5, 1.0);
+addKeyMap("i", 8.5, 1.0);
+addKeyMap("o", 9.5, 1.0);
+addKeyMap("p",10.5, 1.0);
+addKeyMap("a", 1.8, 2.0);
+addKeyMap("s", 2.8, 2.0);
+addKeyMap("d", 3.8, 2.0);
+addKeyMap("f", 4.8, 2.0);
+addKeyMap("g", 5.8, 2.0);
+addKeyMap("h", 6.8, 2.0);
+addKeyMap("j", 7.8, 2.0);
+addKeyMap("k", 8.8, 2.0);
+addKeyMap("l", 9.8, 2.0);
+addKeyMap(";",10.8, 2.0);
+addKeyMap("z", 2.3, 3.0);
+addKeyMap("x", 3.3, 3.0);
+addKeyMap("c", 4.3, 3.0);
+addKeyMap("v", 5.3, 3.0);
+addKeyMap("b", 6.3, 3.0);
+addKeyMap("n", 7.3, 3.0);
+addKeyMap("m", 8.3, 3.0);
+addKeyMap(",", 9.3, 3.0);
+addKeyMap(".",10.3, 3.0);
+addKeyMap("/",11.3, 3.0);
+addKeyMap(" ", 6.5, 4.0);
+addKeyMap("\n",13.2, 2.0); // enter
+
+var canvasHighlight = document.getElementById("keyHighlight");
+
+function level(title, promptLength, keys)
+{
+	this.title = title;
+	this.promptLength = promptLength;
+	this.keys = keys;
+}
+
+var levels = [
+	new level("Basic Home Keys",          6, "ffffffjjjjjjfffjjjkkkkkkddddddkkkdddllllllsssssslllsssaaaaaa;;;;;;aaa;;;"),
+	new level("More Home Keys",           6, "jfjfjffjfjfjdkdkdkkdkdkdslslsllslsls;a;a;aa;a;a;jkjkjkfdfdfdklklkldsdsds"),
+	new level("Combo Home Keys",          6, "jajjajfaffafdaddadkakkaklallalsassasflaflajlajladladlaslaslaallallasfall"),
+	new level("Word Home Keys",           6, "dadladfall;;slakladalalakallaksaksakfakfakkaskasfasjaklasjaksasjakdassal"),
+	new level("Extended Home Keys",       6, "hhhggghhhgggjjjfffjjjfffhhhggghhhgggjjhhjjffggffjjhhjjffggffjhjhjhfgfgfg"),
+	new level("More Extended Home Keys",  6, "hfhfhfgjgjgjjfhgjfjjghffjkfdhghgjfkddkjfghfdjkghgfdsa;hjkklajfhfdgksdlhg"),
+	// ---- GUIDE ------------                 "------xxxxxx------xxxxxx------xxxxxx------xxxxxx------xxxxxx------xxxxxx------"
+	new level("Up and Down Keys",         6, "frvfrvjumjumdecdecki,ki,swxswxlo.lo.aqzaqz;p/;p/urieowurieowmv,c.xmv,c.xqpqpz/"),
+	// ---- GUIDE ------------                 "--------xxxxxxxx--------xxxxxxxx--------xxxxxxxx--------xxxxxxxx--------xxxxxxxx"
+	new level("More Up and Down Keys",    8, "rruuvvmmiiee,,ccooww..xxppqq//zzurmvie,cow.xpq/ziieexxooqqppzz//xx..uurrrruuoo.."),
+	// ---- GUIDE ------------                 "------xxxxxx------xxxxxx------xxxxxx------xxxxxx------xxxxxx------xxxxxx------xxxxxx"
+	new level("Up and Down Words",        6, "fumfumdimdimsilsilrikrikjedjedkeskesleflefmedmedallallfallgowalldorowpoedoemow"),
+	new level("Extended Up and Down",    6, "jjhhyyjjhhnnggttbbjjmmnjjuuyffvvbffrrtjhyjhyfgtfgtjhnjhnfgbfgbyfyfyftjtjtjnfnfnfvjvj"),
+	// ---- GUIDE ------------                 "--------xxxxxxxx--------xxxxxxxx--------xxxxxxxx--------xxxxxxxx--------xxxxxxxx"
+	new level("All Keys With Spaces",    8, "you goodit is okbox of ifall offsaw a soview a tglow allhall allthe pillhill top"),
+	// ---- GUIDE ------------                 "----------xxxxxxxxxx----------xxxxxxxxxx----------xxxxxxxxxx----------xxxxxxxxxx----------xxxxxxxxxx"
+	new level("Basic Words",            10, "tell me itnow is thefirst timethe fox towait quietdove a zooball, wallgood readyplaying tothe holly."),
+	// ---- GUIDE ------------                 "--------------------xxxxxxxxxxxxxxxxxxxx--------------------xxxxxxxxxxxxxxxxxxxx--------------------xxxxxxxxxxxxxxxxxxxx"
+	new level("Sentences",              20, "This is so easy now.Quick, we should go.The van drove by us.Well, he was faster.And then called her.Finally, he arrived."),
+	];
+
+var prompt = "";
+var typing = "";
+var levelIndex = -1;
+var promptIndex = -1;
+var promptMistake = false;
+var mistakes = 0;
+var difficulty = 8; // number of mistakes allowed
+var levelFails = 0;
+var levelDifficulty = 3; // number of times failed level before move back to previous
+var levelEnded = false;
+var timeoutID = undefined;
+//var score = 0;
+
+window.onload = function()
+{
+	divScore = document.getElementById("divScore");
+	divPrompt = document.getElementById("divPrompt");
+	divTyping = document.getElementById("divTyping");
+	divTyping.style.color = "green";
+
+	divProgress = document.getElementById("divProgress");
+	divMistakes = document.getElementById("divMistakes");
+	divAttempts = document.getElementById("divAttempts");
+
+	selectLevel = document.getElementById("selectLevel");
+    for(var i = 0; i < levels.length; i++) 
+    {
+        option = document.createElement("option");
+        option.value = i;
+        option.innerHTML = (i + 1) + " - " + levels[i].title;
+        option.class = "selectStyle";
+        selectLevel.appendChild(option);
+    }
+    score = parseInt(getCookie("score"));
+    if(isNaN(score)) score = 0;
+	reset(-1);
+};
+
+function reset(index)
+{
+	levelIndex = index;
+	nextLevel();
+}
+
+function changeLevel()
+{
+	var levelNumber = selectLevel.selectedIndex + 1;
+	if(levelNumber > 0 && levelNumber <= levels.length)
+	{
+		reset(levelNumber-2);
+	}
+}
+
+function nextPrompt()
+{
+	promptMistake = false;
+	divPrompt.style.color = "black";
+	promptIndex++;
+	level = levels[levelIndex];
+	if(promptIndex >= level.keys.length)
+	{
+		endLevel();
+		return;
+	}
+	setPrompt();
+	if((promptIndex % level.promptLength) == 0)
+	{
+		if(mistakes >= difficulty)
+		{
+			levelFails++;
+			if(levelFails >= levelDifficulty)
+			{
+				prevLevel();
+				return;
+			}
+			mistakes = 0;
+			promptIndex = 0;
+			setPrompt();
+		}
+		divPrompt.innerHTML = level.keys.slice(promptIndex, promptIndex + level.promptLength);
+		typing = "";
+		divTyping.innerHTML = typing;
+	}
+	setLevelDisplay();
+}
+
+function setPrompt()
+{
+	prompt = level.keys.slice(promptIndex, promptIndex+1);
+	if(timeoutID)
+	{
+		clearTimeout(timeoutID);
+	}
+	clearPromptHighlight();
+	timeoutID = setTimeout(showPromptHighlight, 500);
+}
+
+function clearPromptHighlight()
+{
+	var ctx = canvasHighlight.getContext("2d");
+	ctx.fillStyle = "rgba(255,255,255,0)";
+	ctx.clearRect(0,0,canvasHighlight.width, canvasHighlight.height);
+}
+
+function showPromptHighlight()
+{
+	keyMap = keyMaps[prompt];
+	if(null != keyMap)
+	{
+		var scale = 50.0;
+		var ctx = canvasHighlight.getContext("2d");
+		ctx.beginPath();
+		ctx.arc(scale / 2.2 + keyMap.x * scale, scale / 1.55 + keyMap.y * scale, scale / 1.5, 0, 2 * Math.PI);
+		ctx.lineWidth = 5;
+		ctx.strokeStyle = "rgba(255,0,0,100)";
+		ctx.stroke();
+	}
+}
+
+function endLevel()
+{
+	divPrompt.innerHTML = "HOORAY! You did it!";
+	if(levels.length > levelIndex+1)
+	{
+		divTyping.innerHTML = "Press ENTER for level " + (levelIndex + 2);
+	}
+	else
+	{
+		divTyping.innerHTML = "YOU ARE A TYPING MASTER!";
+	}
+	levelEnded = true;
+	var points = Math.floor(levelIndex / 3) + 1;
+	score += points;
+	setCookie("score", score, 1);
+	prompt = "\n";
+	showPromptHighlight();
+	setScoreDisplay();
+	setProgressBars();
+}
+
+function nextLevel()
+{
+	levelEnded = false;
+	promptIndex = -1;
+	mistakes = 0;
+	levelFails = 0;
+	levelIndex++;
+    selectLevel.selectedIndex = levelIndex;
+	setLevelDisplay();
+	nextPrompt();
+}
+
+function setLevelDisplay()
+{
+	setScoreDisplay();
+	setProgressBars();
+}
+
+function setScoreDisplay()
+{
+	divScore.innerHTML = "Score:&nbsp;" + score;
+}
+
+function setProgressBars()
+{
+	if(level && level.keys)
+	{
+		divProgress.style.width = Math.round(100.0 * (promptIndex / level.keys.length), 0) + "%";
+		divMistakes.style.width = Math.round(100.0 * (Math.min(mistakes, difficulty) / difficulty), 0) + "%";
+		divAttempts.style.width = Math.round(100.0 * (levelFails / (levelDifficulty-1)), 0) + "%";
+	}
+}
+
+function prevLevel()
+{
+	levelIndex = Math.max(-1, levelIndex - 2);
+	nextLevel();
+}
+
+// block the backspace from navigating to prior page
+document.onkeydown = function(e)
+{
+	var e = e || window.event;
+  	if (e.keyCode == 8) // backspace
+  	{
+  		e.preventDefault();
+  	}
+}
+
+document.onkeypress = onKeyPress;
+
+function onKeyPress(e) 
+{
+	// get the keycode depending on browser, first try 'which' since it may have ENTER correct, then 'charCode' (most browsers), then 'keyCode' (MSIE)
+	var keyCode = (e.which != null) ? e.which : (e.charCode != null) ? e.charCode : e.keyCode;
+	if(levelEnded)
+	{
+		if(keyCode==13)  // ENTER
+		{
+			nextLevel();
+		}
+	}
+	else 
+	{
+		var key = String.fromCharCode(keyCode);
+		if(key == prompt)
+		{
+			typing = typing + key;
+			divTyping.innerHTML = typing;
+			nextPrompt();
+		}
+		else
+		{
+			if(!promptMistake) // only allow one mistake for prompt - don't keep adding mistakes (also avoids repeat keys)
+			{
+				divPrompt.style.color = "red";
+				mistakes++;
+				promptMistake = true;
+				setLevelDisplay();
+			}
+		}
+	}
+	// make sure the key isn't handled by the browser's default behavior - such as / triggering 'find' in Firefox
+	e.preventDefault();
+}
+
+function setCookie(cname, cvalue, exhours) 
+{
+    var d = new Date();
+    d.setTime(d.getTime() + (exhours*60*60*1000));
+    var expires = "expires="+d.toUTCString();
+    document.cookie = cname + "=" + cvalue + "; " + expires;
+}
+
+function getCookie(cname) 
+{
+    var name = cname + "=";
+    var ca = document.cookie.split(';');
+    for(var i=0; i<ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0)==' ') c = c.substring(1);
+        if (c.indexOf(name) == 0) return c.substring(name.length, c.length);
+    }
+    return "";
+}
+
+</script>
+
+</html>

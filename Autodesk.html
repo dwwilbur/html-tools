@@ -1,0 +1,270 @@
+<html>
+<head>
+  <title>Autodesk</title>
+  <meta name='viewport' content='initial-scale=1, maximum-scale=1, user-scalable=0, minimal-ui' />
+  <style>
+body, html
+{
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+canvas
+{
+	position:absolute;
+}
+  </style>
+</head>
+<body bgcolor="black" onresize="sizeCanvas();" onload="load();">
+
+<canvas id="canvas"></canvas> 
+
+<script type="text/javascript" >
+
+NUM_POINTS = 26;
+NUM_LINES = 19;
+MAX_COUNTER = 100;
+WAIT_TICKS = 40;
+SCALE_NORMALIZER = 150.0;
+
+counter = 0;
+iteration = 0;
+dir = 1;
+wait = WAIT_TICKS;
+dragPos = undefined;
+
+points =
+[
+    [ 35, 25, 5 ],
+    [ -50, 25, 65 ],
+    [ -55, 0, 45 ],
+    [ -50, 25, 5 ],
+    [ -45, 0, 5 ],
+    [ -55, 0, 35 ],
+    [ -60, -25, 35 ],
+    [ -45, 0, 45 ],
+    [ -40, -25, 65 ],
+    [ 45, 25, -60 ],
+    [ 45, 15, -40 ],
+    [ 45, -25, -40 ],
+    [ 65, -25, -60 ],
+    [ 65, 25, -60 ],
+    [ 5, 25, 35 ],
+    [ 20, 25, 45 ],
+    [ 20, -25, 45 ],
+    [ -30, 25, -30 ],
+    [ -30, -25, -30 ],
+    [ -5, -25, -5 ],
+    [ -5, -25, -30 ],
+    [ -5, 25, -30 ],
+    [ -60, -25, 5 ],
+    [ -5, 25, -5 ],
+    [ -55, 0, -10 ],
+    [ -45, 0, -30 ]
+];
+
+lines = 
+[
+    [ 1, 2 ],
+    [ 3, 4 ],
+    [ 4, 5 ],
+    [ 5, 6 ],
+    [ 7, 8 ],
+    [ 9, 10 ],
+    [ 10, 11 ],
+    [ 11, 12 ],
+    [ 12, 13 ],
+    [ 13, 9 ],
+    [ 0, 14 ],
+    [ 15, 16 ],
+    [ 17, 18 ],
+    [ 18, 19 ],
+    [ 20, 21 ],
+    [ 6, 22 ],
+    [ 21, 23 ],
+    [ 24, 25 ],
+    [ 19, 20 ]
+];
+
+document.onkeydown = function(event) 
+{ 
+  switch(event.keyCode)
+  {
+    case 32: //SPACE
+    {
+		fullScreen();
+    }
+  }
+}
+
+canvas.onmousedown = function(e) 
+{
+	if (!e) e = window.event;
+	dragPos = getMouseClientPosition(e);
+};
+
+canvas.onmouseup = function(event) 
+{
+	dragPos = undefined;
+};
+
+window.onmousemove = function (e)
+{
+	if (!e) e = window.event;
+	if(dragPos)
+	{
+		dragPos = getMouseClientPosition(e);
+	}
+}
+
+function rotate(point, yAxisAngle, xAxisAngle)
+{
+    var newX = point[0] * Math.cos(yAxisAngle) - point[2] * Math.sin(yAxisAngle);
+    var newZ = point[0] * Math.sin(yAxisAngle) + point[2] * Math.cos(yAxisAngle);
+
+    point[2] = newZ;
+    
+    newZ     = point[2] * Math.cos(xAxisAngle) - point[1] * Math.sin(xAxisAngle);
+    var newY = point[2] * Math.sin(xAxisAngle) + point[1] * Math.cos(xAxisAngle);
+
+    point[0] = newX;
+    point[1] = newY;
+    point[2] = newZ;
+}
+
+function center( point, width, height )
+{
+    point[0] += width/2;
+    point[1] = height/2 - point[1];
+}
+
+function scale( point, scale )
+{
+    point[0] *= scale;
+    point[1] *= scale;
+    point[2] *= scale;
+}
+
+function drawLine(ctx, width, height, counter, ptStart, ptEnd, yAxisAngle, xAxisAngle)
+{
+    rotate( ptStart, yAxisAngle, xAxisAngle );
+    rotate( ptEnd, yAxisAngle, xAxisAngle );
+
+    scl = Math.min(width, height) / SCALE_NORMALIZER;
+    
+    scale( ptStart, scl );
+    scale( ptEnd, scl );
+    
+    center( ptStart, width, height );
+    center( ptEnd, width, height );
+
+	ctx.beginPath();
+	ctx.moveTo(ptStart[0], ptStart[1]);
+	ctx.lineTo(ptEnd[0], ptEnd[1]);
+	ctx.strokeStyle="white";
+	ctx.stroke();
+}
+
+function draw()
+{
+	var canvas = document.getElementById("canvas");
+	var ctx = canvas.getContext('2d');
+	var width = canvas.width;
+	var height = canvas.height;
+
+	ctx.fillStyle="black";
+	ctx.fillRect(0, 0, width, height);
+
+	iterIdx = Math.floor(iteration/2) % 3;
+    var yAxisAngle = iterIdx == 1 ? 0 : counter * Math.PI * 1.5 / MAX_COUNTER;
+    var xAxisAngle = iterIdx == 2 ? 0 : counter * Math.PI * 2 / MAX_COUNTER;
+	if(dragPos)
+	{
+        yAxisAngle = (dragPos.x - width/2) / SCALE_NORMALIZER;
+        xAxisAngle = (dragPos.y - height/2) / SCALE_NORMALIZER;
+	}
+
+	for(var lineIdx = 0; lineIdx < NUM_LINES; ++lineIdx)
+	{
+		var ptStart = points[ lines[lineIdx][0] ].slice(0);
+		var ptEnd = points[ lines[lineIdx][1] ].slice(0);
+		drawLine( ctx, width, height, counter, ptStart, ptEnd, yAxisAngle, xAxisAngle);
+	}
+
+	if( wait > -1 )
+	{
+		--wait;
+	}
+	else
+	{
+		counter += dir;
+		if( (counter >= MAX_COUNTER) || (counter < 1) )
+		{
+			iteration++;
+			dir *= -1;
+			wait = WAIT_TICKS;
+		}
+	}
+}
+
+function load()
+{
+	sizeCanvas();
+	window.scrollTo(0,1);
+	window.onorientationchange = function() { window.scrollTo(0,1); sizeCanvas(); }
+	setInterval(draw, 60);
+}
+
+function sizeCanvas()
+{
+	var canvas = document.getElementById("canvas");
+	var width = window.innerWidth;
+	var height = window.innerHeight;
+	canvas.width = width;
+	canvas.height = height;
+	canvas.style.width = width + "px";
+	canvas.style.height = height + "px";
+}
+
+function fullScreen() 
+{
+	var el = document.body;
+    // Supports most browsers and their versions.
+    var requestMethod = el.requestFullScreen || el.webkitRequestFullScreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+
+    if (requestMethod) 
+    { // Native full screen.
+        requestMethod.call(el);
+    } 
+    else if (typeof window.ActiveXObject !== "undefined") 
+    { // Older IE.
+        var wscript = new ActiveXObject("WScript.Shell");
+        if (wscript !== null) {
+            wscript.SendKeys("{F11}");
+        }
+    }
+    return false;
+}
+
+function getMouseClientPosition(event)
+{
+  var position = { x: 0, y: 0 };
+  if(event.x != undefined && event.y != undefined)
+  {
+    position.x = event.x;
+    position.y = event.y;
+  }
+  else // firefox client x/y
+  {
+    position.x = event.clientX;
+    position.y = event.clientY;
+  }
+  return position;
+}
+
+</script>
+
+</body>
+</html>

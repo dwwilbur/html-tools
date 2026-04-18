@@ -1,0 +1,198 @@
+
+
+<html>
+<head>
+  <title>Spatial Business Systems</title>
+  <meta name='viewport' content='initial-scale=1, maximum-scale=1, user-scalable=0, minimal-ui' />
+  <style>
+body, html
+{
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+canvas
+{
+  position:absolute;
+}
+  </style>
+</head>
+<body bgcolor="black" onresize="sizeCanvas();" onload="load();">
+
+<canvas id="canvas"></canvas>
+
+<script type="text/javascript" >
+
+
+document.onkeydown = function(e)
+{
+  if (!e) e = window.event;
+
+  switch(e.keyCode)
+  {
+    case 32: //SPACE
+    {
+      break;
+    }
+    case 16: //SHIFT
+    {
+      break;
+    }
+  }
+}
+
+document.onkeyup = function(e)
+{
+  if (!e) e = window.event;
+
+  switch(e.keyCode)
+  {
+    case 16: //SHIFT
+    {
+      break;
+    }
+  }
+}
+
+var canvas = document.getElementById("canvas");
+
+canvas.onmousemove = function (e)
+{
+  if (!e) e = window.event;
+  if (e.shiftKey)
+  {
+  }
+  if (e.altKey) 
+  {
+  }
+  if (e.ctrlKey)
+  {
+  }
+  if (e.metaKey)
+  {
+  }
+}
+
+canvas.onmousedown = function(e)
+{
+  if (!e) e = window.event;
+  canvasPosition = getMouseClientPosition(e);
+  if(e.which == 1 || e.button == 1) // mouse left button
+  {
+  }
+  else if(e.which == 3 || e.button == 2) // mouse right button
+  {
+  }
+};
+
+canvas.addEventListener('contextmenu', function(e)
+{
+    if (!e) e = window.event;
+    e.preventDefault(); // keep the right click from bringing up the context menu, instead we use it for zoom out
+    return false;
+}, false);
+
+function getMouseClientPosition(event)
+{
+  var position = { x: 0, y: 0 };
+  if(event.x != undefined && event.y != undefined)
+  {
+    position.x = event.x;
+    position.y = event.y;
+  }
+  else // firefox client x/y
+  {
+    position.x = event.clientX;
+    position.y = event.clientY;
+  }
+  return position;
+}
+
+
+function draw()
+{
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.beginPath();
+  for(var y = 0; y < height; y++)
+  {
+    for(var x = 0; x < width; x++)
+    {
+      ctx.moveTo(x, y);
+      ctx.lineTo(y, x);
+      ctx.stroke();
+    }
+  }
+}
+
+var timeoutID = undefined;
+
+function loop(timeout)
+{
+  timeoutID = setTimeout(function() 
+    {
+      var maxTimeout = 60;
+      var startTime = (new Date()).getTime();
+      draw();
+      var endTime = (new Date()).getTime();
+      loop(maxTimeout - (endTime - startTime));
+    }, timeout);
+}
+
+function load()
+{
+  sizeCanvas();
+  window.scrollTo(0,1);
+  window.onorientationchange = function() { window.scrollTo(0,1); sizeCanvas(); }
+  //loop(1);
+}
+
+function sizeCanvas()
+{
+  if(timeoutID)
+  {
+    clearTimeout(timeoutID);
+  }
+
+  // need to set a timeout so the browser can refresh or resize more before we reset everything which can take a slight delay
+  timeoutID = setTimeout(function() 
+    {
+      var canvas = document.getElementById("canvas");
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
+
+      ctx = canvas.getContext("2d");
+      loop(1);
+    }, 60);
+}
+
+function fullScreen() 
+{
+  var el = document.body;
+  // Supports most browsers and their versions.
+  var requestMethod = el.requestFullScreen || el.webkitRequestFullScreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+
+  if (requestMethod) 
+  { // Native full screen.
+      requestMethod.call(el);
+  } 
+  else if (typeof window.ActiveXObject !== "undefined") 
+  { // Older IE.
+      var wscript = new ActiveXObject("WScript.Shell");
+      if (wscript !== null) {
+          wscript.SendKeys("{F11}");
+      }
+  }
+  return false;
+}
+
+</script>
+
+</body>
+</html>
+

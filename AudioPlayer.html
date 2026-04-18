@@ -1,0 +1,73 @@
+<html>
+<head>
+  <title>Audio Player</title>
+  <style>
+    body{
+    color: white;
+    background-color: #252525;
+    }
+    td{
+    font-weight: bold;
+    font-family: sans-serif;
+    text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+<input type="file" id="files" name="files[]" webkitdirectory directory multiple />
+<output id="list"></output>
+
+<script type="text/javascript" >
+
+function reset(audioIndex)
+{
+  var audio = document.getElementById("audio" + audioIndex);
+  audio.pause();
+  audio.currentTime = 0;
+  audio.volume = 1.0;
+}
+
+function handleFileSelect(evt)
+{
+  var inputFiles = evt.target;
+  inputFiles.style.visibility = "hidden";
+  var files = inputFiles.files; // FileList object
+
+  // Loop through the FileList and load the audio files
+  var output = [];
+  for (var i = 0, f; f = files[i]; i++) 
+  {
+    // Only process sound files.
+    if (!f.type.match('audio.*')) 
+    {
+      continue;
+    }
+    var url = URL.createObjectURL(f);
+    //audio[i] = new Audio(url);
+    //audio[i].load();
+
+    var nameNoExtension = f.name.substr(0, f.name.lastIndexOf('.'));
+    output.push(
+      '<tr>',
+      '<td>', nameNoExtension, '</td>',
+      '<td><audio controls ', '" id="audio', i, '"><source src="', url, '" type="', f.type, '"/></audio></td>',
+      '<td><input type="button" value="Reset" onclick="reset(', i, ');" /></td>',
+      //'<input type="button" value="Play" onclick="audio[', i, '].play();" />',
+      //'<input type="button" value="Stop" onclick="audio[', i, '].stop();" />',
+      //f.size, ' bytes, last modified: ',
+      //f.lastModifiedDate ? f.lastModifiedDate.toLocaleDateString() : 'n/a',
+      //url,
+      '</tr>');
+  }
+  document.getElementById('list').innerHTML = '<table>' + output.join('') + '</table>';
+}
+
+document.getElementById('files').addEventListener('change', handleFileSelect, false);
+
+</script>
+
+</font>
+</body>
+</html>
+

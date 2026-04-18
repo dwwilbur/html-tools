@@ -1,0 +1,611 @@
+
+
+<html>
+<head>
+  <title>Fractal Explorer</title>
+  <meta name='viewport' content='initial-scale=1, maximum-scale=1, user-scalable=0, minimal-ui' />
+  <style>
+body, html
+{
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+canvas
+{
+  position:absolute;
+}
+textarea
+{
+  display: none;
+  position:absolute;
+  width: 700px;
+  height: 60px;
+  top: 370px;
+  left: 24px;
+  background: black;
+  color: white;
+  opacity: 0.7;
+}
+  </style>
+</head>
+<body bgcolor="black" onresize="sizeCanvas();" onload="load();">
+
+<canvas id="canvas"></canvas>
+
+<textarea id="linkTextArea" readonly></textarea>
+
+<script type="text/javascript" >
+
+var zoomAmount = 0.8;
+var z = 0;
+var zoom = 3 / 1000;
+var offsetX = -2.0;
+var offsetY = -1.0;
+var canvasPosition = { x: -offsetX / zoom, y: -offsetY / zoom }; // default to 0,0 julia coord
+var julia = false;
+var juliaX = 0;
+var juliaY = 0;
+var juliaAdjustStart = false;
+var juliaStartPosition = undefined;
+var colorX = 80;
+var colorY = 250;
+var cycle = true;
+var cycleDir = -1;
+var needRecalc = false;
+var roughPix = 5;
+var maxIncIter = 4;
+var maxLoresIter = 1024;
+var fullCalcIterLimit = 0;
+var reds = [];
+var blues = [];
+var greens = [];
+var showHelp = 2;
+var showCalcMessage = false;
+var lowIter = -1;
+var highIter = 0;
+var highIterPreview = 0;
+var allDone = false;
+
+document.onkeydown = function(e)
+{
+  if (!e) e = window.event;
+
+  switch(e.keyCode)
+  {
+    case 32: //SPACE
+    {
+      julia = !julia;
+      if(!julia)
+      {
+        // set the mandelbrot view offset to match the julia set's coord, centered
+        canvasPosition.x = width / 2;
+        canvasPosition.y = height / 2;
+        offsetX = juliaX - (canvasPosition.x * zoom);
+        offsetY = juliaY - (canvasPosition.y * zoom);
+      }
+      needRecalc = true;
+      break;
+    }
+    case 16: //SHIFT
+    {
+      if(!juliaStartPosition)
+      {
+        juliaAdjustStart = true;
+      }
+      break;
+    }
+    case 67: //"C"
+    {
+      cycle = !cycle;
+      break;
+    }
+    case 68: //"D"
+    {
+      cycleDir *= -1;
+      break;
+    }
+    case 70: //"F"
+    {
+      clearTimeout(timeoutID);
+      timeoutID = undefined;
+      fullScreen();
+      needRecalc = true;
+      break;
+    }
+    case 72: //"H"
+    {
+      showHelp = (showHelp + 1) % 3;
+      showLink(false, false);
+      break;
+    }
+    case 76: //"L"
+    {
+      showLink(true, true);
+      break;
+    }
+    case 82: //"R"
+    {
+      fullCalcIterLimit = 0;
+      clearCache(true); // clear image as well - remove lores image
+      break;
+    }
+  }
+}
+
+function showLink(showHide, toggle)
+{
+  // update link and toggle text area display
+  var linkArea = document.getElementById("linkTextArea");
+  var linkShowing = linkArea.style.display == "block";
+  if(toggle ? linkShowing : !showHide)
+  {
+    linkArea.style.display = "none";
+  }
+  else
+  {
+    linkArea.value = getFullLink();
+    linkArea.style.display = "block";
+    linkArea.focus();
+    linkArea.select();
+  }
+}
+
+document.onkeyup = function(e)
+{
+  if (!e) e = window.event;
+  switch(e.keyCode)
+  {
+    case 16: //SHIFT
+    {
+      juliaStartPosition = undefined;
+      break;
+    }
+  }
+}
+
+var canvas = document.getElementById("canvas");
+
+canvas.onmousemove = function (e)
+{
+  if (!e) e = window.event;
+  if (e.shiftKey) // shift to new julia set coordinate (no effect on mandelbrot)
+  {
+    showLink(false, false);
+    var position = getMouseClientPosition(e);
+    if(juliaAdjustStart)
+    {
+      juliaAdjustStart = false;
+    }
+    else
+    {
+      oldJuliaX = juliaX;
+      juliaX = juliaX + (position.x - juliaStartPosition.x) * zoom;
+      juliaY = juliaY + (position.y - juliaStartPosition.y) * zoom;
+      needRecalc = true;
+    }
+    juliaStartPosition = position;
+  }
+  if (e.altKey) // not used (yet!)
+  {
+  }
+  if (e.ctrlKey) // set the color according to mouse position
+  {
+    showLink(false, false);
+    colorPosition = getMouseClientPosition(e);
+    colorX = colorPosition.x;
+    colorY = colorPosition.y;
+    setColors();
+  }
+  if (e.metaKey)
+  {
+  }
+}
+
+canvas.onmousedown = function(e)
+{
+  if (!e) e = window.event;
+  showLink(false, false);
+  canvasPosition = getMouseClientPosition(e);
+  if(e.which == 1 || e.button == 1) // mouse left button
+  {
+    zoomOffset(canvasPosition, zoomAmount); // zoom in
+  }
+  else if(e.which == 3 || e.button == 2) // mouse right button
+  {
+    zoomOffset(canvasPosition, 1.0 / zoomAmount); // zoom out
+  }
+  if(!julia)
+  {
+    // set the julia coords to match the point where the mandelbrot was clicked
+    juliaX = (canvasPosition.x * zoom) + offsetX;
+    juliaY = (canvasPosition.y * zoom) + offsetY;
+  }
+};
+
+function zoomOffset(position, factor)
+{
+    var oldZoom = zoom;
+    zoom *= factor;
+    offsetX = position.x * (oldZoom - zoom) + offsetX;
+    offsetY = position.y * (oldZoom - zoom) + offsetY;
+    needRecalc = true;
+}
+
+canvas.addEventListener('contextmenu', function(e)
+{
+    if (!e) e = window.event;
+    e.preventDefault(); // keep the right click from bringing up the context menu, instead we use it for zoom out
+    return false;
+}, false);
+
+function getMouseClientPosition(event)
+{
+  var position = { x: 0, y: 0 };
+  if(event.x != undefined && event.y != undefined)
+  {
+    position.x = event.x;
+    position.y = event.y;
+  }
+  else // firefox client x/y
+  {
+    position.x = event.clientX;
+    position.y = event.clientY;
+  }
+  return position;
+}
+
+function setColors()
+{
+  var rFac = colorX * 0.01;
+  var gFac = colorY * 0.01;
+  var bFac = (colorX * colorY) * 0.0001;
+  for(var i = 0; i <= 256; i++)
+  {
+    reds[i] = (i * rFac) % 256;
+    blues[i] = (i * gFac) % 256;
+    greens[i] = (i * bFac) % 256;
+  }
+}
+
+function clearCache(clearImage)
+{
+  allDone = false;
+  highIter = 0;
+  var lineLen = width * 4;
+  for(var y = 0; y < height; y++)
+  {
+    for(var x = 0; x < width; x++)
+    {
+      var offset = x + (y * width);
+      var x0 = (x * zoom) + offsetX;
+      var y0 = (y * zoom) + offsetY;
+      var xx = julia ? x0 : 0;
+      var yy = julia ? y0 : 0;
+      imgDataXxArray[offset] = xx;
+      imgDataYyArray[offset] = yy;
+      imgDataIterIncArray[offset] = 0;
+
+      if(clearImage)
+      {
+        lowIter = -1;
+        highIterPreview = 0;
+        imgDataIterArray[offset] = maxLoresIter;
+        var imgOffset = (x * 4) + (y * lineLen);
+        imgDataArray[imgOffset + 0] = 0;
+        imgDataArray[imgOffset + 1] = 0;
+        imgDataArray[imgOffset + 2] = 0;
+        imgDataArray[imgOffset + 3] = 255;
+      }
+    }
+  }
+}
+
+function draw()
+{
+  if(needRecalc)
+  {
+    lowIter = -1;
+    highIter = 0;
+    highIterPreview = 0;
+  }
+  if(fullCalcIterLimit == 0)
+  {
+    clearCache(false);
+  }
+  if(cycle)
+  {
+    z = (z + 256 + cycleDir) % 256;
+  }
+
+  var newAllDone = !needRecalc;
+  var newHighIter = highIter;
+  var oldLimit = fullCalcIterLimit - maxIncIter;
+  var iterLimit = needRecalc ? maxLoresIter : fullCalcIterLimit;
+  var lineLen = width * 4;
+  for(var y = 0; y < height; y++)
+  {
+    for(var x = 0; x < width; x++)
+    {
+      var done = false;
+      var offset = x + (y * width);
+      var modOffset = needRecalc ? (x % roughPix) + (y % roughPix * width) : 0;
+      var iter = needRecalc ? 0 : imgDataIterIncArray[offset];
+      if( needRecalc ? (modOffset == 0) : ((iter >= oldLimit) && !allDone) )
+      {
+        // do a real fractal calc
+        var x0 = (x * zoom) + offsetX;
+        var y0 = (y * zoom) + offsetY;
+        var xC = julia ? juliaX : x0;
+        var yC = julia ? juliaY : y0;
+
+        var xx = needRecalc ? (julia ? x0 : 0) : imgDataXxArray[offset];
+        var yy = needRecalc ? (julia ? y0 : 0) : imgDataYyArray[offset];
+        while (iter < iterLimit)
+        {
+          var xx2 = xx*xx;
+          var yy2 = yy*yy;
+          if((xx2 + yy2) >= 4)
+          {
+            done = true;
+            break;
+          }
+          yy = 2*xx*yy + yC;
+          xx = xx2 - yy2 + xC;
+          iter++;
+        }
+
+        lowIter = (done && ((lowIter < 0) || (lowIter > iter))) ? iter : lowIter;
+
+        if(needRecalc)
+        {
+          // doing a lo res display, so just store the current iteration value
+          imgDataIterArray[offset] = iter;
+          highIterPreview = Math.max(highIterPreview, iter);
+        }
+        else
+        {
+          imgDataXxArray[offset] = xx;
+          imgDataYyArray[offset] = yy;
+          imgDataIterIncArray[offset] = iter;
+          newAllDone = newAllDone && done;
+          if(done || (iter > maxLoresIter))
+          {
+            // the hi res is done iterating, so store it in the final array
+            imgDataIterArray[offset] = iter;
+            highIter = Math.max(highIter, iter);
+          }
+          else
+          {
+            // the hi res is not done, so load the prior lo res values for current display
+            iter = imgDataIterArray[offset - modOffset];
+          }
+        }
+      }
+      else
+      {
+        // no need to calculate, or in a mod offset location for lo res mode - just get the iteration from the final array
+        iter = imgDataIterArray[offset - modOffset];
+        if(modOffset > 0)
+        {
+          imgDataIterArray[offset] = iter;
+        }
+      }
+
+      // display the pixel color value
+      var imgOffset = (x * 4) + (y * lineLen);
+      if(iter < maxLoresIter || iter < iterLimit)
+      {
+        // paint a color based on the color arrays
+        var colorIter = ((iter % 256) + z) % 256;
+        imgDataArray[imgOffset + 0] = reds[colorIter];
+        imgDataArray[imgOffset + 1] = blues[colorIter];
+        imgDataArray[imgOffset + 2] = greens[colorIter];
+        imgDataArray[imgOffset + 3] = 255;
+      }
+      else if(iter >= iterLimit && iterLimit >= maxLoresIter)
+      {
+        // we only want to paint this in lores mode or when hi res is past the lo res limit - keeps from clearing out the lores preview
+        imgDataArray[imgOffset + 0] = 0;
+        imgDataArray[imgOffset + 1] = 0;
+        imgDataArray[imgOffset + 2] = 0;
+        imgDataArray[imgOffset + 3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  allDone = newAllDone;
+  if(showHelp > 0)
+  {
+    var message = getHelpMessage();
+    drawMessage(message, 24, 18);
+  }
+
+  if(needRecalc)
+  {
+    needRecalc = false;
+    fullCalcIterLimit = 0;
+  }
+  else if(!allDone)
+  {
+    fullCalcIterLimit += maxIncIter;
+  }
+}
+
+function drawMessage(message, x, y)
+{
+  drawText(message, x+1, y+1, "black");
+  drawText(message, x+2, y+2, "black");
+  drawText(message, x, y, "white");
+}
+
+function drawText(message, x, y, style)
+{
+  var messageLines = message.split("\n");
+  for(var i = 0; i < messageLines.length; i++)
+  {
+    ctx.font = "14px Courier";
+    ctx.fillStyle = style;
+    ctx.fillText(messageLines[i], x, y + 20 * (i+1));
+  }
+}
+
+function getHelpMessage()
+{
+  var maxHighIter = allDone ? highIter : fullCalcIterLimit;
+  var iterPreviewMessage = ((maxHighIter < highIterPreview) && (highIterPreview > 0)) ? " (" + highIterPreview + " preview)" : "";
+  helpMessage =
+    "Fractal: " + (julia ? "Julia" : "Mandelbrot") + "\n" +
+    "x=" + juliaX + ", y=" + juliaY + ", scale=" + zoom * width + ", max iterations=" + maxHighIter + iterPreviewMessage + ", min iterations=" + ((lowIter < 0) ? "?" : lowIter);
+  if(showHelp > 1)
+  {
+    helpMessage += "\n" +
+      "\n" +
+      " Left click = zoom in\n" +
+      "Right click = zoom out\n" +
+      "      SPACE = switch between Mandelbrot and Julia sets\n" +
+      "      Shift = hold down and move mouse to change Julia set x/y coordinates\n" +
+      "       Ctrl = hold down and move mouse to select a different color range\n" +
+      "          C = turn color cycling on and off\n" +
+      "          D = switch color cycling direction\n" +
+      "          R = re-render without preview\n" +
+      "          L = show link to current fractal\n" +
+      "          F = full screen mode\n" +
+      "\n" +
+      "          H = turn this help on and off\n";
+  } 
+  return helpMessage;
+}
+
+var timeoutID = undefined;
+
+function loop(timeout)
+{
+  timeoutID = setTimeout(function() 
+    {
+      var maxTimeout = 60;
+      var startTime = (new Date()).getTime();
+      draw();
+      var endTime = (new Date()).getTime();
+      loop(maxTimeout - (endTime - startTime));
+    }, timeout);
+}
+
+function load()
+{
+  readParams();
+  sizeCanvas();
+  setColors();
+  window.scrollTo(0,1);
+  window.onorientationchange = function() { window.scrollTo(0,1); sizeCanvas(); }
+  loop(1);
+}
+
+function readParams()
+{
+  var params = getParams();
+  for (var key in params)
+  {
+    var value = params[key];
+    window[key] = value =="true" ? true : value == "false" ? false : parseFloat(value);
+  }
+}
+
+function getParams()
+{
+  var params = {};
+  var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi,    
+    function(m, key, value) {
+      params[key] = value;
+    });
+  return params;
+}
+
+function getCurrentParams()
+{
+  var params = 
+    "?julia=" + julia +
+    "&juliaX=" + juliaX +
+    "&juliaY=" + juliaY +
+    "&offsetX=" + offsetX +
+    "&offsetY=" + offsetY +
+    "&zoom=" + zoom +
+    "&colorX=" + colorX +
+    "&colorY=" + colorY +
+    "&cycle=" + cycle +
+    "&cycleDir=" + cycleDir;
+  return params;
+}
+
+function getFullLink()
+{
+  var mainUrl = window.location.href.split("?")[0];
+  var params = getCurrentParams();
+  return "Check out my awesome fractal!\n" + mainUrl + params;
+}
+
+function sizeCanvas()
+{
+  if(timeoutID)
+  {
+    clearTimeout(timeoutID);
+  }
+
+  // if(showHelp > 0)
+  // {
+  //   drawMessage("Initializing...", width/2, height/2);
+  // }
+
+  // need to set a timeout so the browser can refresh or resize more before we reset everything which can take a slight delay
+  timeoutID = setTimeout(function() 
+    {
+      var canvas = document.getElementById("canvas");
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
+
+      ctx = canvas.getContext("2d");
+      imgData = ctx.createImageData(width, height);
+      imgDataArray = imgData.data;
+      imgDataIterArray = [];
+      imgDataIterIncArray = [];
+      imgDataXxArray = [];
+      imgDataYyArray = [];
+      fullCalcIterLimit = 0;
+      needRecalc = true;
+      clearCache(true);
+      loop(1);
+    }, 60);
+}
+
+function fullScreen() 
+{
+  var el = document.body;
+  // Supports most browsers and their versions.
+  var requestMethod = el.requestFullScreen || el.webkitRequestFullScreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+
+  if (requestMethod) 
+  { // Native full screen.
+      requestMethod.call(el);
+  } 
+  else if (typeof window.ActiveXObject !== "undefined") 
+  { // Older IE.
+      var wscript = new ActiveXObject("WScript.Shell");
+      if (wscript !== null) {
+          wscript.SendKeys("{F11}");
+      }
+  }
+  return false;
+}
+
+</script>
+
+</body>
+</html>
+

@@ -1,0 +1,218 @@
+
+<html>
+<head>
+  <title>Graphics</title>
+  <meta name='viewport' content='initial-scale=1, maximum-scale=1, user-scalable=0, minimal-ui' />
+</head>
+<body bgcolor="gray" onresize="sizeCanvas();" onload="load();">
+
+<canvas id="canvas" width="500" height="500"></canvas> 
+
+<script type="text/javascript" >
+
+zoomAmount = 0.8;
+z = 0;
+canvasPosition = { x: 250, y: 250 };
+zoom = 6.0 / 500;
+offsetX = -3.0;
+offsetY = -3.0;
+colorPosition = { x: 250, y: 250 };
+
+numAtoms = 10;
+theConstant = 1.0;
+xMax = 1000;
+yMax = 500;
+
+function createAtom(x, y, c)
+{
+  return { x: x, y: y, c: c, dx: 0, dy: 0}
+}
+
+function reset()
+{
+  atoms = [];
+  for(var i = 0; i < numAtoms; i++)
+  {
+    var j = i+557;
+    atoms[i] = createAtom((j*j) % xMax, ((j+15)*j*j) % yMax, (j % 3) - 1);
+  }
+}
+
+function draw()
+{
+  var rFac = colorPosition.x / 100;
+  var gFac = colorPosition.y / 100;
+  var bFac = (colorPosition.x + colorPosition.y) / 100;
+  z++;
+  for(var i = 0; i < numAtoms; i++)
+  {
+    var atom = atoms[i];
+    if(atom.c != 0)
+    {
+      for(var j = 0; j < numAtoms; j++)
+      {
+        var otherAtom = atoms[j];
+        var dx = atom.x - otherAtom.x;
+        var dy = atom.y - otherAtom.y;
+        if(dx != 0.0)
+        {
+          atom.dx += (1.0 / dx) * (atom.c * otherAtom.c) * theConstant;
+        }
+        if(dy != 0.0)
+        {
+          atom.dy += (1.0 / dy) * (atom.c * otherAtom.c) * theConstant;
+        }
+      }
+    }
+  }
+  for(var i = 0; i < numAtoms; i++)
+  {
+    var atom = atoms[i];
+    atom.x = (atom.x + atom.dx) % xMax;
+    atom.y = (atom.y + atom.dy) % yMax;
+    paintPixel(Math.round(atom.x), Math.round(atom.y), atom.c == 1 ? 255 : 0, atom.c == 0 ? 255 : 0, atom.c == -1 ? 255 : 0, 255);
+  }
+  // for(y = 0; y < height; y++)
+  // {
+  //   for(x = 0; x < width; x++)
+  //   {
+  //     var r = (z * z / x * rFac) % 256;
+  //     var g = (z * z / y * gFac) % 256;
+  //     var b = (x / y * z * bFac) % 256;
+  //     paintPixel(x, y, r, g, b, 255);
+  //   }
+  // }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+document.onkeydown = function(event) 
+{ 
+  switch(event.keyCode)
+  {
+    case 32: //SPACE
+    {
+      reset();
+    }
+    case 16: //SHIFT
+    {
+    }
+  }
+}
+
+window.onmousemove = function (e)
+{
+  if (!e) e = window.event;
+  if (e.shiftKey) 
+  {
+  }
+  if (e.altKey) 
+  {
+  }
+  if (e.ctrlKey) 
+  {
+    colorPosition = getMouseClientPosition(event);
+  }
+  if (e.metaKey)
+  {
+  }
+}
+
+canvas.onmousedown = function(event) 
+{
+  canvasPosition = getMouseClientPosition(event);
+  if(event.which == 1) // mouse left button
+  {
+    zoomOffset(canvasPosition, zoomAmount); // zoom in
+  }
+  else if(event.which == 3) // mouse right button
+  {
+    zoomOffset(canvasPosition, 1.0 / zoomAmount); // zoom out
+  }
+  if(!julia)
+  {
+    juliaX = (canvasPosition.x * zoom) + offsetX;
+    juliaY = (canvasPosition.y * zoom) + offsetY;
+  }
+};
+
+function zoomOffset(position, factor)
+{
+    var oldZoom = zoom;
+    zoom *= factor;
+    offsetX = position.x * (oldZoom - zoom) + offsetX;
+    offsetY = position.y * (oldZoom - zoom) + offsetY;
+}
+
+canvas.addEventListener('contextmenu', function(event)
+{
+    event.preventDefault(); // keep the right click from bringing up the context menu, instead we use it for zoom out
+    return false;
+}, false);
+
+function getMouseClientPosition(event)
+{
+  var position = { x: 0, y: 0 };
+  if(event.x != undefined && event.y != undefined)
+  {
+    position.x = event.x;
+    position.y = event.y;
+  }
+  else // firefox client x/y
+  {
+    position.x = event.clientX; // + document.body.scrollLeft + document.documentElement.scrollLeft;
+    position.y = event.clientY; // + document.body.scrollTop + document.documentElement.scrollTop;
+  }
+  return position;
+}
+
+function paintPixel(x, y, r, g, b, a)
+{
+  var offset = (x * 4) + (y * (width * 4));
+  imgDataArray[offset + 0] = r;
+  imgDataArray[offset + 1] = g;
+  imgDataArray[offset + 2] = b;
+  imgDataArray[offset + 3] = a;
+}
+
+function load()
+{
+  sizeCanvas();
+  reset();
+  window.scrollTo(0,1);
+  window.onorientationchange = function() { window.scrollTo(0,1); sizeCanvas(); }
+  setInterval(draw, 60);
+}
+
+function sizeCanvas()
+{
+  var canvas = document.getElementById("canvas");
+  width = window.innerWidth - 20;
+  height = window.innerHeight - 20;
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
+
+  ctx = canvas.getContext('2d');
+  imgData = ctx.createImageData(width, height);
+  imgDataArray = imgData.data;
+
+  clearCanvas();
+}
+
+function clearCanvas()
+{
+  for(y = 0; y < height; y++)
+  {
+    for(x = 0; x < width; x++)
+    {
+      paintPixel(x, y, 0, 0, 0, 255);
+    }
+  }
+}
+
+</script>
+
+</body>
+</html>
+
